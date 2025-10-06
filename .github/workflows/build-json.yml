@@ -70,11 +70,21 @@ jobs:
           if [[ -n "${PLAYLIST_ORIGIN:-}" ]]; then ORIGIN_ARG=(--origin "$PLAYLIST_ORIGIN"); fi
           mkdir -p output
           if [[ -d code-repo ]]; then
-            FILTER_ARG=(--filter "${FILTER_PATH:-code-repo/src/filter.js}")
+            # Resolve filter path safely with fallback to default
+            FILTER_ARG=()
+            if [[ -n "${FILTER_PATH:-}" && -f "${FILTER_PATH}" ]]; then
+              FILTER_ARG=(--filter "${FILTER_PATH}")
+            elif [[ -f "code-repo/src/filter.js" ]]; then
+              FILTER_ARG=(--filter "code-repo/src/filter.js")
+            fi
             node code-repo/bin/m3u-to-json.js --url "$PLAYLIST_URL" "${REFERER_ARG[@]}" "${ORIGIN_ARG[@]}" "${FILTER_ARG[@]}" --write-both --out-dir output --out api.json --out-filter filtered.json
           else
             # fallback: CLI is in this repo
-            node bin/m3u-to-json.js --url "$PLAYLIST_URL" "${REFERER_ARG[@]}" "${ORIGIN_ARG[@]}" --filter src/filter.js --write-both --out-dir output --out api.json --out-filter filtered.json
+            if [[ -f src/filter.js ]]; then
+              node bin/m3u-to-json.js --url "$PLAYLIST_URL" "${REFERER_ARG[@]}" "${ORIGIN_ARG[@]}" --filter src/filter.js --write-both --out-dir output --out api.json --out-filter filtered.json
+            else
+              node bin/m3u-to-json.js --url "$PLAYLIST_URL" "${REFERER_ARG[@]}" "${ORIGIN_ARG[@]}" --write-both --out-dir output --out api.json --out-filter filtered.json
+            fi
           fi
 
       - name: Validate secrets for target repo access
@@ -107,7 +117,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .
-          git commit -m "Auto: update api.json and filtered.json $(date -u +'%Y-%m-%dT%H:%M:%SZ')" || echo "No changes to commit"
+          BD_DATE=$(TZ=Asia/Dhaka date +'%Y-%m-%d')
+          BD_TIME=$(TZ=Asia/Dhaka date +'%I:%M:%S %p')
+          git commit -m "Auto: update api.json and filtered.json [${BD_DATE}] (${BD_TIME} BD)" || echo "No changes to commit"
           git push
 
       # Removed local commit step to prevent writing outputs to auto-update repo
