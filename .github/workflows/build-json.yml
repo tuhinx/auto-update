@@ -14,10 +14,10 @@ jobs:
       PLAYLIST_ORIGIN: ${{ secrets.PLAYLIST_ORIGIN }}
       TARGET_REPO: ${{ secrets.TARGET_REPO }}        # e.g. your-org/target-repo
       TARGET_TOKEN: ${{ secrets.TARGET_TOKEN }}      # PAT with repo permissions
-      TARGET_BRANCH: ${{ secrets.TARGET_BRANCH }}    # e.g. main (default)
+      TARGET_BRANCH: ${{ secrets.TARGET_BRANCH }}    # e.g. master (default)
       TARGET_DIR: ${{ secrets.TARGET_DIR }}          # subdir in target repo, e.g. public or . (optional)
       CODE_REPO: ${{ secrets.CODE_REPO }}            # e.g. your-org/ayna-tv-fetch (the repo that has the CLI code)
-      CODE_REF: ${{ secrets.CODE_REF }}              # branch/tag of code repo (default: main)
+      CODE_REF: ${{ secrets.CODE_REF }}              # branch/tag of code repo (default: master)
       FILTER_PATH: ${{ secrets.FILTER_PATH }}        # optional path to filter file; defaults to code-repo/src/filter.js
       CODE_TOKEN: ${{ secrets.CODE_TOKEN }}          # PAT with repo:read for CODE_REPO (private)
     steps:
@@ -37,7 +37,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ env.CODE_REPO }}
-          ref: ${{ env.CODE_REF || 'main' }}
+          ref: ${{ env.CODE_REF || 'master' }}
           token: ${{ env.CODE_TOKEN }}
           path: code-repo
 
@@ -77,13 +77,31 @@ jobs:
             node bin/m3u-to-json.js --url "$PLAYLIST_URL" "${REFERER_ARG[@]}" "${ORIGIN_ARG[@]}" --filter src/filter.js --write-both --out-dir output --out api.json --out-filter filtered.json
           fi
 
+      - name: Validate secrets for target repo access
+        if: env.TARGET_REPO != '' && env.TARGET_TOKEN == ''
+        shell: bash
+        run: |
+          echo "TARGET_REPO is set to '${TARGET_REPO}', but TARGET_TOKEN is empty." >&2
+          echo "Provide a PAT with Contents: Read/Write for the target repo to enable pushing." >&2
+          exit 1
+
+      - name: Debug target push condition
+        shell: bash
+        run: |
+          echo "TARGET_REPO='${TARGET_REPO:-}'"
+          if [[ -n "${TARGET_REPO:-}" && -n "${TARGET_TOKEN:-}" ]]; then
+            echo "Push to target repo will run."
+          else
+            echo "Push to target repo will be skipped (missing TARGET_REPO or TARGET_TOKEN)."
+          fi
+
       - name: Push artifacts to external private repo
         if: env.TARGET_REPO != '' && env.TARGET_TOKEN != ''
         uses: actions/checkout@v4
         with:
           repository: ${{ env.TARGET_REPO }}
           token: ${{ env.TARGET_TOKEN }}
-          ref: ${{ env.TARGET_BRANCH || 'main' }}
+          ref: ${{ env.TARGET_BRANCH || 'master' }}
           path: target-repo
 
       - name: Copy artifacts into target repo and push
