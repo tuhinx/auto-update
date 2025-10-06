@@ -1,0 +1,78 @@
+name: Build JSON hourly
+
+on:
+  schedule:
+    - cron: '0 * * * *' # every hour
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      PLAYLIST_URL: ${{ secrets.PLAYLIST_URL }}
+      PLAYLIST_REFERER: ${{ secrets.PLAYLIST_REFERER }}
+      PLAYLIST_ORIGIN: ${{ secrets.PLAYLIST_ORIGIN }}
+      TARGET_REPO: ${{ secrets.TARGET_REPO }}        # e.g. your-org/target-repo
+      TARGET_TOKEN: ${{ secrets.TARGET_TOKEN }}      # PAT with repo permissions
+      TARGET_BRANCH: ${{ secrets.TARGET_BRANCH }}    # e.g. main (default)
+      TARGET_DIR: ${{ secrets.TARGET_DIR }}          # subdir in target repo, e.g. public or . (optional)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install deps
+        run: |
+          npm ci || npm install
+
+      - name: Build JSON files
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${PLAYLIST_URL:-}" ]]; then
+            echo "PLAYLIST_URL secret is not set. Please add it in repo settings > Secrets and variables > Actions." >&2
+            exit 1
+          fi
+          REFERER_ARG=""
+          ORIGIN_ARG=""
+          if [[ -n "${PLAYLIST_REFERER:-}" ]]; then REFERER_ARG=(--referer "$PLAYLIST_REFERER"); fi
+          if [[ -n "${PLAYLIST_ORIGIN:-}" ]]; then ORIGIN_ARG=(--origin "$PLAYLIST_ORIGIN"); fi
+          node bin/m3u-to-json.js --url "$PLAYLIST_URL" "${REFERER_ARG[@]}" "${ORIGIN_ARG[@]}" --filter src/filter.js --write-both --out-dir output --out api.json --out-filter filtered.json
+
+      - name: Push artifacts to external private repo
+        if: env.TARGET_REPO != '' && env.TARGET_TOKEN != ''
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.TARGET_REPO }}
+          token: ${{ env.TARGET_TOKEN }}
+          ref: ${{ env.TARGET_BRANCH || 'main' }}
+          path: target-repo
+
+      - name: Copy artifacts into target repo and push
+        if: env.TARGET_REPO != '' && env.TARGET_TOKEN != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEST_DIR="target-repo/${TARGET_DIR:-.}"
+          mkdir -p "$DEST_DIR"
+          cp -f output/api.json "$DEST_DIR/"
+          cp -f output/filtered.json "$DEST_DIR/"
+          cd target-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "chore: update api.json and filtered.json (external)" || echo "No changes to commit"
+          git push
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add output/api.json output/filtered.json
+          git commit -m "chore: update api.json and filtered.json (hourly)" || echo "No changes to commit"
+          git push
+
