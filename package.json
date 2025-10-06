@@ -1,0 +1,11 @@
+{
+  "name": "auto-update",
+  "version": "1.0.0",
+  "description": "Workflow-only repo. See ayna-tv-fetch/README.md for full instructions.",
+  "private": true,
+  "license": "ISC",
+  "author": "",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
