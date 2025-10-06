@@ -95,6 +95,7 @@ jobs:
           git push
 
       - name: Commit and push changes
+        if: env.TARGET_REPO == ''
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
