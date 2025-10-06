@@ -92,6 +92,7 @@ jobs:
           repository: ${{ env.TARGET_REPO }}
           token: ${{ env.TARGET_TOKEN }}
           ref: ${{ env.TARGET_BRANCH || 'master' }}
+          fetch-depth: 0
           path: target-repo
 
       - name: Copy artifacts into target repo and push
@@ -103,10 +104,16 @@ jobs:
           mkdir -p "$DEST_DIR"
           cp -f output/api.json "$DEST_DIR/"
           cp -f output/filtered.json "$DEST_DIR/"
+          # Verify files exist before commit
+          test -f "$DEST_DIR/api.json" || { echo "api.json not found in $DEST_DIR" >&2; exit 1; }
+          test -f "$DEST_DIR/filtered.json" || { echo "filtered.json not found in $DEST_DIR" >&2; exit 1; }
           cd target-repo
+          # Rebase to avoid non-fast-forward push failures
+          git pull --rebase || true
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .
+          git add -A
+          git status -s || true
           git commit -m "Auto: Update Api.json and Filtered.json {date}{time}" || echo "No changes to commit"
           git push
 
