@@ -19,6 +19,7 @@ jobs:
       CODE_REPO: ${{ secrets.CODE_REPO }}            # e.g. your-org/ayna-tv-fetch (the repo that has the CLI code)
       CODE_REF: ${{ secrets.CODE_REF }}              # branch/tag of code repo (default: main)
       FILTER_PATH: ${{ secrets.FILTER_PATH }}        # optional path to filter file; defaults to code-repo/src/filter.js
+      CODE_TOKEN: ${{ secrets.CODE_TOKEN }}          # PAT with repo:read for CODE_REPO (private)
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,6 +30,7 @@ jobs:
         with:
           repository: ${{ env.CODE_REPO }}
           ref: ${{ env.CODE_REF || 'main' }}
+          token: ${{ env.CODE_TOKEN }}
           path: code-repo
 
       - name: Setup Node.js
