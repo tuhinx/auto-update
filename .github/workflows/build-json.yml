@@ -24,6 +24,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate secrets for code repo access
+        if: env.CODE_REPO != '' && env.CODE_TOKEN == ''
+        shell: bash
+        run: |
+          echo "CODE_REPO is set to '${CODE_REPO}', but CODE_TOKEN is empty." >&2
+          echo "Provide a PAT with Contents: Read for the code repo (private repos require it)." >&2
+          exit 1
+
       - name: Checkout code repo (CLI)
         if: env.CODE_REPO != ''
         uses: actions/checkout@v4
